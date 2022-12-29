@@ -1,9 +1,9 @@
-HasLicencaCheck = function(licenca_type)
+HasLicencaCheck = function(licenca_type, showText)
     local inventory = getPlayer():getInventory()
     if getPlayer():getAccessLevel() == 'Admin' then return true end
     if checkInventoryForLicences(inventory, licenca_type) then return true end
     if checkBagsForLicences(inventory, licenca_type) then return true end
-    getPlayer():setHaloNote("Voce nao tem a licenca para fazer isto!")
+    if showText then getPlayer():setHaloNote("Voce nao tem a licenca para fazer isto!") end
     return false
 end
 
@@ -40,7 +40,7 @@ function checkBagsForLicences(inventory, licenca_type)
 end
 
 function ISSearchManager:checkShouldDisable()
-    if (not HasLicencaCheck("LicencaColetor")) then return true; end
+    if (not HasLicencaCheck("LicencaColetor", true)) then return true; end
     if ISSearchManager.showDebug then return false; end
     local plStats = self.character:getStats();
     if plStats then
@@ -54,7 +54,7 @@ function ISSearchManager:checkShouldDisable()
 end
 
 function ISSearchWindow:update()
-    if (not HasLicencaCheck('LicencaColetor')) then self:removeFromUIManager(); return; end
+    if (not HasLicencaCheck('LicencaColetor', true)) then self:removeFromUIManager(); return; end
     if (not self:getIsVisible()) then return; end
     if self.manager.isSearchMode then
         self.toggleSearchMode.title = getText("UI_disable_search_mode");
@@ -81,11 +81,11 @@ function ISChopTreeAction:isValid()
         self.character:CanAttack() and
         self.character:getPrimaryHandItem() ~= nil and
         self.character:getPrimaryHandItem():getScriptItem():getCategories():contains("Axe") and
-        HasLicencaCheck('LicencaCarpinteiro1')
+        HasLicencaCheck('LicencaCarpinteiro1', true)
 end
 
 function ISFishingAction:isValid()
-    if (not HasLicencaCheck('LicencaCaca')) then return false end
+    if (not HasLicencaCheck('LicencaCaca', true)) then return false end
     local actionQueue = ISTimedActionQueue.getTimedActionQueue(self.character)
     local lastAction = actionQueue.queue[#actionQueue.queue]
     if lastAction and (lastAction.Type ~= "ISFishingAction") then
@@ -98,5 +98,27 @@ end
 
 function ISHarvestPlantAction:isValid()
     self.plant:updateFromIsoObject()
-    return self.plant:getObject() and self.plant:canHarvest() and HasLicencaCheck('LicencaAgricultor')
+    return self.plant:getObject() and self.plant:canHarvest() and HasLicencaCheck('LicencaAgricultor', true)
+end
+
+function ISSeedAction:perform()
+    if self.sound and self.sound ~= 0 then
+        self.character:getEmitter():stopOrTriggerSound(self.sound)
+    end
+
+    for i = 1, self.nbOfSeed do
+        local seed = self.seeds[i];
+        self.character:getInventory():Remove(seed);
+    end
+
+    local sq = self.plant:getSquare()
+    local args = { x = sq:getX(), y = sq:getY(), z = sq:getZ(), typeOfSeed = self.typeOfSeed }
+    CFarmingSystem.instance:sendCommand(self.character, 'seed', args)
+
+    if (HasLicencaCheck('LicencaAgricultor')) then getPlayer():getXp():AddXP(Perks.Farming, 5) else getPlayer():getXp()
+            :AddXP(Perks.Farming, 0)
+    end
+
+    -- needed to remove from queue / start next.
+    ISBaseTimedAction.perform(self);
 end
