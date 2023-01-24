@@ -122,3 +122,50 @@ function ISSeedAction:perform()
     -- needed to remove from queue / start next.
     ISBaseTimedAction.perform(self);
 end
+
+VehicleManager = {}
+VehicleManager.OnSpawnVehicle = function(playerObj)
+    local ui = ISSpawnVehicleUI:new(0, 0, 200, 300, playerObj);
+    ui:initialise();
+    ui:addToUIManager();
+end
+
+local function removeDuplicates(list)
+    local result = {}
+    local seen = {}
+    for _, item in ipairs(list) do
+        if not seen[item] then
+            seen[item] = true
+            table.insert(result, item)
+        end
+    end
+    return result
+end
+
+function VehicleManager.OnMenuFillWorldObjectContextMenu(_player, _context, _worldobjects, _test)
+    local square = nil;
+    for i, v in ipairs(_worldobjects) do
+        square = v:getSquare();
+        break;
+    end
+
+    for i = 1, square:getObjects():size() do
+        table.insert(_worldobjects, square:getObjects():get(i - 1))
+    end
+    _worldobjects = removeDuplicates(_worldobjects)
+    local playerObj = getSpecificPlayer(_player)
+    if (HasLicencaCheck('LicencaConcessionaria')) then
+        local vehicleMenu = _context:addOption("Gerenciar Veiculos", nil, nil)
+        local vehicleSubMenu = _context:getNew(_context)
+        _context:addSubMenu(vehicleMenu, vehicleSubMenu)
+        vehicleSubMenu:addOption('Criar Veiculo', playerObj, VehicleManager.OnSpawnVehicle)
+
+        local vehicle = square:getVehicleContainer()
+        if vehicle ~= nil then
+            vehicleSubMenu:addOption("Remover Veiculo", playerObj, ISVehicleMechanics.onCheatRemove, vehicle);
+        end
+    end
+
+end
+
+Events.OnFillWorldObjectContextMenu.Add(VehicleManager.OnMenuFillWorldObjectContextMenu);
